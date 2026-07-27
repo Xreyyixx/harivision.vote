@@ -7,7 +7,7 @@ let userVotes = {};
 let userName = ''; 
 let timerInterval = null;
 
-// Ambient Canvas Animation
+// Анимация темно-фиолетового фонового канваса
 const canvas = document.getElementById('bg-canvas');
 const ctx = canvas.getContext('2d');
 let stripes = [];
@@ -52,12 +52,12 @@ function animateBg() {
 }
 animateBg();
 
-// Firestore Realtime Listener
+// Слушатель состояния Firestore в реальном времени
 onSnapshot(doc(db, "system", "voting_state"), (docSnap) => {
     if (docSnap.exists()) {
         const newData = docSnap.data();
         
-        // Если началась НОВАЯ сессия голосования, сбрасываем локальную блокировку пользователя
+        // Автоматический сброс локальной блокировки при старте НОВОЙ сессии
         const savedSession = localStorage.getItem('harivision_voted_session');
         if (newData.sessionId && savedSession !== newData.sessionId) {
             localStorage.removeItem('harivision_voted_session');
@@ -89,7 +89,7 @@ function startTimerLoop() {
     }, 1000);
 }
 
-// Global Event Handlers
+// Глобальные обработчики
 window.assignScore = function(points, participantId) {
     for (const p in userVotes) {
         if (userVotes[p] === participantId) delete userVotes[p];
@@ -126,11 +126,10 @@ window.submitVote = async function() {
         await addDoc(collection(db, "votes"), {
             voterName: nameValue,
             allocations: userVotes,
-            sessionId: systemState.sessionId, // Привязка голоса к текущей сессии
+            sessionId: systemState.sessionId,
             timestamp: serverTimestamp()
         });
         
-        // Запоминаем, что пользователь проголосовал В ЭТОЙ конкретной сессии
         localStorage.setItem('harivision_voted_session', systemState.sessionId);
         render();
     } catch (e) {
@@ -154,46 +153,46 @@ function render() {
     const isExpired = systemState.endsAt && (systemState.endsAt.toMillis() <= Date.now());
     const hasVotedInCurrentSession = localStorage.getItem('harivision_voted_session') === systemState.sessionId && systemState.sessionId;
 
-    // ЭКРАН 3: Участник уже проголосовал в ТЕКУЩЕЙ сессии
+    // СОСТОЯНИЕ 3: Участник проголосовал в текущей сессии
     if (hasVotedInCurrentSession) {
         card.innerHTML = `
             <div class="flex flex-col items-center text-center my-auto py-10 page-fade">
                 <div class="w-20 h-20 bg-purple-900/40 border border-purple-500/40 flex items-center justify-center mb-6 text-yellow-400 shadow-[0_0_30px_rgba(168,85,247,0.2)]">
                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                 </div>
-                <h2 class="text-2xl md:text-3xl font-black text-white uppercase tracking-widest mb-2">Thank you for your vote!</h2>
-                <p class="text-sm text-purple-300 font-medium mb-8">Your vote has been successfully received.</p>
+                <h2 class="text-2xl md:text-3xl font-black text-white uppercase tracking-widest mb-2">Спасибо за ваш голос!</h2>
+                <p class="text-sm text-purple-300 font-medium mb-8">Ваш голос был успешно получен.</p>
                 <div class="border-t border-purple-500/10 pt-6 w-full max-w-sm">
-                    <p class="text-xs text-slate-400 font-medium tracking-wide">Enjoy the rest of HariVision Performance Contest.</p>
+                    <p class="text-xs text-slate-400 font-medium tracking-wide">Наслаждайтесь остальной частью HariVision Performance Contest.</p>
                 </div>
             </div>
         `;
         return;
     }
 
-    // ЭКРАН 1 и 4: Голосование не начато или завершено
+    // СОСТОЯНИЕ 1 и 4: Голосование не началось или уже закрыто
     if (systemState.status === 'closed' || (systemState.status === 'open' && isExpired)) {
         if (systemState.status === 'open' && isExpired) {
             card.innerHTML = `
                 <div class="flex flex-col items-center text-center my-auto py-10 page-fade">
-                    <h1 class="text-2xl md:text-3xl font-extrabold text-white uppercase tracking-widest mb-4">Voting is now closed.</h1>
-                    <p class="text-sm text-purple-300 font-medium mb-2">Thank you for supporting HariVision Performance Contest.</p>
-                    <p class="text-xs text-slate-400">Enjoy the show!</p>
+                    <h1 class="text-2xl md:text-3xl font-extrabold text-white uppercase tracking-widest mb-4">Голосование закрыто.</h1>
+                    <p class="text-sm text-purple-300 font-medium mb-2">Спасибо за поддержку HariVision Performance Contest.</p>
+                    <p class="text-xs text-slate-400">Приятного просмотра шоу!</p>
                 </div>
             `;
         } else {
             card.innerHTML = `
                 <div class="flex flex-col items-center text-center my-auto py-10 page-fade">
                     <div class="mb-6 animate-pulse">${getHeartSVG()}</div>
-                    <h1 class="text-3xl md:text-4xl font-extrabold text-white uppercase tracking-widest mb-3">Please wait…</h1>
-                    <p class="text-xs md:text-sm font-bold text-purple-400 uppercase tracking-widest">Voting will start in a few minutes.</p>
+                    <h1 class="text-3xl md:text-4xl font-extrabold text-white uppercase tracking-widest mb-3">Пожалуйста, подождите…</h1>
+                    <p class="text-xs md:text-sm font-bold text-purple-400 uppercase tracking-widest">Голосование начнется через несколько минут.</p>
                 </div>
             `;
         }
         return;
     }
 
-    // ЭКРАН 2: Голосование открыто
+    // СОСТОЯНИЕ 2: Голосование открыто
     startTimerLoop();
 
     if (currentSubPage === 'home') {
@@ -201,11 +200,11 @@ function render() {
             <div class="flex flex-col items-center text-center my-auto py-8 page-fade">
                 <div class="mb-6 scale-125">${getHeartSVG()}</div>
                 <h1 class="text-2xl md:text-4xl font-extrabold uppercase tracking-widest text-white mb-2">HariVision</h1>
-                <div class="text-xs md:text-sm font-bold text-purple-400 uppercase tracking-widest mb-8">Performance Contest | August 2026</div>
+                <div class="text-xs md:text-sm font-bold text-purple-400 uppercase tracking-widest mb-8">Performance Contest | Август 2026</div>
                 <div class="w-full max-w-md bg-[#140b29] border border-purple-500/15 p-8 rounded-none">
-                    <h2 class="text-lg font-bold text-white uppercase tracking-wider mb-2">Public Voting</h2>
-                    <p class="text-xs text-slate-300 font-medium mb-8 leading-relaxed">Watch the recap as many times as you need before casting your vote.</p>
-                    <button onclick="navigateTo('recap')" class="w-full bg-purple-700 hover:bg-purple-600 text-white font-extrabold text-xs uppercase tracking-widest py-4 rounded-none transition shadow-lg">Start Voting</button>
+                    <h2 class="text-lg font-bold text-white uppercase tracking-wider mb-2">Публичное голосование</h2>
+                    <p class="text-xs text-slate-300 font-medium mb-8 leading-relaxed">Посмотрите повтор столько раз, сколько нужно, прежде чем отдать свой голос.</p>
+                    <button onclick="navigateTo('recap')" class="w-full bg-purple-700 hover:bg-purple-600 text-white font-extrabold text-xs uppercase tracking-widest py-4 rounded-none transition shadow-lg">Начать голосование</button>
                 </div>
             </div>
         `;
@@ -213,18 +212,18 @@ function render() {
         card.innerHTML = `
             <div class="flex flex-col h-full justify-between gap-6 page-fade">
                 <div class="flex items-center justify-between border-b border-purple-500/10 pb-4">
-                    <h2 class="text-xl font-bold text-white uppercase tracking-wider">Recap Video</h2>
-                    <span class="text-[10px] font-bold uppercase tracking-widest text-purple-400">Duration: ~02:00</span>
+                    <h2 class="text-xl font-bold text-white uppercase tracking-wider">Повтор выступлений</h2>
+                    <span class="text-[10px] font-bold uppercase tracking-widest text-purple-400">Длительность: ~02:00</span>
                 </div>
                 <div class="relative w-full aspect-video bg-[#090414] border border-purple-500/20 flex flex-col items-center justify-center p-6 text-center group">
                     <div class="w-16 h-16 rounded-none bg-purple-900/40 border border-purple-500/30 flex items-center justify-center mb-4 text-purple-300">
                         <svg class="w-8 h-8 fill-current ml-1" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                     </div>
-                    <p class="text-sm md:text-base font-bold text-slate-200 uppercase tracking-wider mb-1">The recap video will appear here.</p>
+                    <p class="text-sm md:text-base font-bold text-slate-200 uppercase tracking-wider mb-1">Здесь появится видео повтора</p>
                 </div>
                 <div class="flex flex-col md:flex-row gap-4 pt-2">
-                    <button disabled class="flex-1 bg-[#15092b] border border-purple-500/20 text-purple-500/50 font-bold text-xs uppercase tracking-widest py-4 rounded-none cursor-not-allowed">Watch Recap</button>
-                    <button onclick="navigateTo('voting')" class="flex-1 bg-purple-700 hover:bg-purple-600 text-white font-extrabold text-xs uppercase tracking-widest py-4 rounded-none transition shadow-lg">Proceed to Voting</button>
+                    <button disabled class="flex-1 bg-[#15092b] border border-purple-500/20 text-purple-500/50 font-bold text-xs uppercase tracking-widest py-4 rounded-none cursor-not-allowed">Смотреть повтор</button>
+                    <button onclick="navigateTo('voting')" class="flex-1 bg-purple-700 hover:bg-purple-600 text-white font-extrabold text-xs uppercase tracking-widest py-4 rounded-none transition shadow-lg">Перейти к голосованию</button>
                 </div>
             </div>
         `;
@@ -233,17 +232,17 @@ function render() {
         card.innerHTML = `
             <div class="flex flex-col gap-6 page-fade">
                 <div class="flex items-center justify-between border-b border-purple-500/10 pb-4">
-                    <h2 class="text-xl font-bold text-white uppercase tracking-wider">Allocate Points</h2>
+                    <h2 class="text-xl font-bold text-white uppercase tracking-wider">Распределение баллов</h2>
                     <div class="flex items-center gap-4">
-                        <span class="text-xs font-mono font-bold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-3 py-1">Voting closes in <span id="voting-timer">${formatTimer()}</span></span>
-                        <button onclick="navigateTo('recap')" class="text-[10px] font-bold uppercase tracking-widest text-purple-400 hover:text-white transition">↺ Recap</button>
+                        <span class="text-xs font-mono font-bold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-3 py-1">Голосование закроется через <span id="voting-timer">${formatTimer()}</span></span>
+                        <button onclick="navigateTo('recap')" class="text-[10px] font-bold uppercase tracking-widest text-purple-400 hover:text-white transition">↺ Повтор</button>
                     </div>
                 </div>
 
-                <!-- Поле ввода имени участника -->
+                <!-- Ввод имени -->
                 <div class="bg-[#140b29] border border-purple-500/20 p-4">
-                    <label class="block text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-2">Your Name / Имя Голосующего</label>
-                    <input type="text" id="voter-name-input" value="${userName}" oninput="updateUserName(this.value)" placeholder="Enter your full name..." class="w-full bg-[#090414] border border-purple-500/20 px-4 py-2.5 text-xs text-white focus:outline-none focus:border-purple-400" />
+                    <label class="block text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-2">Ваше имя / Псевдоним</label>
+                    <input type="text" id="voter-name-input" value="${userName}" oninput="updateUserName(this.value)" placeholder="Введите ваше имя..." class="w-full bg-[#090414] border border-purple-500/20 px-4 py-2.5 text-xs text-white focus:outline-none focus:border-purple-400" />
                 </div>
 
                 <div class="grid grid-cols-1 gap-3 max-h-[300px] overflow-y-auto pr-1">
@@ -253,10 +252,10 @@ function render() {
                             <div class="flex items-center justify-between bg-[#15092b] border border-purple-500/15 p-3 md:p-4 rounded-none">
                                 <div class="flex items-center gap-3 shrink-0">
                                     <span class="w-10 h-10 flex items-center justify-center font-mono font-black text-sm md:text-base ${pts >= 10 ? 'bg-yellow-500 text-slate-950' : 'bg-purple-900/80 text-purple-200 border border-purple-500/20'}">${pts}</span>
-                                    <span class="text-xs font-bold uppercase tracking-wider text-purple-300">Points</span>
+                                    <span class="text-xs font-bold uppercase tracking-wider text-purple-300">Баллов</span>
                                 </div>
                                 <select onchange="assignScore(${pts}, this.value)" class="bg-[#090414] border border-purple-500/20 text-white font-medium text-xs md:text-sm px-4 py-2.5 rounded-none focus:outline-none focus:border-purple-400 w-48 md:w-64 transition">
-                                    <option value="">-- Select Participant --</option>
+                                    <option value="">-- Выберите участника --</option>
                                     ${DEFAULT_PARTICIPANTS.map(p => {
                                         if (assignedParticipantIds.includes(p.id) && currentAssignedId !== p.id) return '';
                                         return `<option value="${p.id}" ${currentAssignedId === p.id ? 'selected' : ''}>${p.name}</option>`;
@@ -267,7 +266,7 @@ function render() {
                     }).join('')}
                 </div>
                 <div class="pt-2 border-t border-purple-500/10">
-                    <button onclick="submitVote()" class="w-full bg-purple-700 hover:bg-purple-600 text-white font-extrabold text-xs uppercase tracking-widest py-4 rounded-none transition shadow-lg">Submit Vote</button>
+                    <button onclick="submitVote()" class="w-full bg-purple-700 hover:bg-purple-600 text-white font-extrabold text-xs uppercase tracking-widest py-4 rounded-none transition shadow-lg">Отправить голос</button>
                 </div>
             </div>
         `;
