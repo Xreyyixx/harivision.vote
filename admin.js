@@ -8,7 +8,7 @@ let revealMode = false;
 let previousVoteCount = 0;
 let votesUnsubscribe = null;
 
-// Auth Listeners
+// Проверка состояния авторизации
 onAuthStateChanged(auth, (user) => {
     if (user) {
         document.getElementById('auth-panel').classList.add('hidden');
@@ -36,7 +36,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
 document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
 
-// Запуск НОВОЙ сессии с уникальным ID
+// Запуск новой сессии с генерацией уникального ID
 window.openVoting = async function(minutes) {
     const newSessionId = 'session_' + Date.now();
     const endsAt = minutes > 0 ? new Date(Date.now() + minutes * 60000) : null;
@@ -66,7 +66,7 @@ function showNotification(voterName) {
     const container = document.getElementById('toast-container');
     container.innerHTML = `
         <div class="bg-green-500/20 border border-green-500/40 text-green-300 font-bold text-xs uppercase tracking-wider px-3 py-1.5 flex items-center gap-2 animate-bounce">
-            ✓ New vote from: ${voterName || 'Anonymous'}
+            ✓ Новый голос от: ${voterName || 'Аноним'}
         </div>
     `;
     setTimeout(() => { container.innerHTML = ''; }, 3500);
@@ -77,7 +77,7 @@ function initDashboardListeners() {
         const data = docSnap.exists() ? docSnap.data() : { status: 'closed' };
         const isLive = data.status === 'open' && (!data.endsAt || data.endsAt.toMillis() > Date.now());
 
-        // При смене сессии переподписываемся на слушатель голосов
+        // При смене сессии создаем новую подписку на Firestore
         if (data.sessionId && data.sessionId !== currentSessionId) {
             currentSessionId = data.sessionId;
             revealMode = false;
@@ -87,12 +87,12 @@ function initDashboardListeners() {
         const ind = document.getElementById('live-indicator');
         if (isLive) {
             ind.className = "flex items-center gap-2 text-xs font-bold uppercase tracking-widest px-3 py-1 bg-green-500/10 text-green-400 border border-green-500/20";
-            ind.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Open`;
+            ind.innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Открыто`;
             document.getElementById('open-controls').classList.add('hidden');
             document.getElementById('close-controls').classList.remove('hidden');
         } else {
             ind.className = "flex items-center gap-2 text-xs font-bold uppercase tracking-widest px-3 py-1 bg-red-500/10 text-red-400 border border-red-500/20";
-            ind.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500"></span> Closed`;
+            ind.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500"></span> Закрыто`;
             document.getElementById('open-controls').classList.remove('hidden');
             document.getElementById('close-controls').classList.add('hidden');
         }
@@ -102,14 +102,14 @@ function initDashboardListeners() {
             const diff = Math.max(0, Math.floor((data.endsAt.toMillis() - Date.now()) / 1000));
             const m = Math.floor(diff / 60);
             const s = diff % 60;
-            timerEl.innerText = `Voting ends in: ${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            timerEl.innerText = `Голосование завершится через: ${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         } else {
-            timerEl.innerText = isLive ? "Voting ends in: Unlimited" : "Voting ends in: --:--";
+            timerEl.innerText = isLive ? "Голосование завершится через: Без лимита" : "Голосование завершится через: --:--";
         }
     });
 }
 
-// Слушатель голосов ИСКЛЮЧИТЕЛЬНО текущей сессии
+// Загрузка голосов ТОЛЬКО активной сессии
 function subscribeToSessionVotes(sessionId) {
     if (votesUnsubscribe) votesUnsubscribe();
 
@@ -135,13 +135,13 @@ function renderVotersList() {
     if (!listEl) return;
     
     if (votesData.length === 0) {
-        listEl.innerHTML = `<span class="text-[10px] text-slate-500 italic">No votes yet</span>`;
+        listEl.innerHTML = `<span class="text-[10px] text-slate-500 italic">Голосов пока нет</span>`;
         return;
     }
 
     listEl.innerHTML = votesData.map(v => `
         <span class="bg-[#15092b] border border-purple-500/20 text-purple-200 text-[10px] font-medium px-2 py-1 rounded-none">
-            👤 ${v.voterName || 'Anonymous'}
+            👤 ${v.voterName || 'Аноним'}
         </span>
     `).join('');
 }
