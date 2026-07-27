@@ -1,14 +1,15 @@
 import { auth, db, DEFAULT_PARTICIPANTS } from './config.js';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { doc, setDoc, onSnapshot, collection, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { doc, setDoc, deleteDoc, onSnapshot, collection, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 let votesData = [];
 let currentSessionId = null;
 let revealMode = false;
 let previousVoteCount = 0;
 let votesUnsubscribe = null;
+let activeModalVoteId = null;
 
-// Проверка состояния авторизации
+// Проверка авторизации
 onAuthStateChanged(auth, (user) => {
     if (user) {
         document.getElementById('auth-panel').classList.add('hidden');
@@ -36,7 +37,6 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
 document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
 
-// Запуск новой сессии с генерацией уникального ID
 window.openVoting = async function(minutes) {
     const newSessionId = 'session_' + Date.now();
     const endsAt = minutes > 0 ? new Date(Date.now() + minutes * 60000) : null;
@@ -62,6 +62,52 @@ window.revealResults = function() {
     renderMatrix();
 };
 
+window.closeVoteModal = function() {
+    document.getElementById('vote-modal').classList.add('hidden');
+    activeModalVoteId = null;
+};
+
+// Функция открытия детального просмотра голоса
+window.inspectVote = function(voteId) {
+    const vote = votesData.find(v => v.id === voteId);
+    if (!vote) return;
+
+    activeModalVoteId = voteId;
+    document.getElementById('modal-voter-name').innerText = `Голос от: ${vote.voterName || 'Аноним'}`;
+    
+    const detailsEl = document.getElementById('modal-voter-details');
+    detailsEl.innerHTML = `
+        <div>Тип голоса: <strong>${vote.isNational ? 'Национальный (' + vote.representative + ')' : 'Публичный'}</strong></div>
+        <div>Время: <strong>${vote.timestamp ? new Date(vote.timestamp.toMillis()).toLocaleTimeString() : 'Только что'}</strong></div>
+    `;
+
+    const allocEl = document.getElementById('modal-allocations');
+    allocEl.innerHTML = Object.entries(vote.allocations || {}).map(([pts, pId]) => {
+        const participant = DEFAULT_PARTICIPANTS.find(p => p.id === pId);
+        return `
+            <div class="flex items-center justify-between bg-[#15092b] border border-purple-500/20 px-3 py-1.5 font-mono text-xs">
+                <span class="text-white">${participant ? participant.name : pId}</span>
+                <span class="font-bold text-yellow-400">+${pts} б.</span>
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('reset-vote-btn').onclick = () => resetVote(voteId);
+    document.getElementById('vote-modal').classList.remove('hidden');
+};
+
+// Обнуление голоса администратором
+async function resetVote(voteId) {
+    if (!confirm("Вы уверены, что хотите обнулить этот голос? Пользователь сможет проголосовать повторно.")) return;
+    
+    try {
+        await deleteDoc(doc(db, "votes", voteId));
+        closeVoteModal();
+    } catch (e) {
+        alert("Ошибка при обнулении голоса: " + e.message);
+    }
+}
+
 function showNotification(voterName) {
     const container = document.getElementById('toast-container');
     container.innerHTML = `
@@ -77,7 +123,6 @@ function initDashboardListeners() {
         const data = docSnap.exists() ? docSnap.data() : { status: 'closed' };
         const isLive = data.status === 'open' && (!data.endsAt || data.endsAt.toMillis() > Date.now());
 
-        // При смене сессии создаем новую подписку на Firestore
         if (data.sessionId && data.sessionId !== currentSessionId) {
             currentSessionId = data.sessionId;
             revealMode = false;
@@ -109,14 +154,13 @@ function initDashboardListeners() {
     });
 }
 
-// Загрузка голосов ТОЛЬКО активной сессии
 function subscribeToSessionVotes(sessionId) {
     if (votesUnsubscribe) votesUnsubscribe();
 
     const q = query(collection(db, "votes"), where("sessionId", "==", sessionId));
     
     votesUnsubscribe = onSnapshot(q, (snapshot) => {
-        votesData = snapshot.docs.map(doc => doc.data());
+        votesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         if (votesData.length > previousVoteCount && previousVoteCount !== 0) {
             const latestVote = votesData[votesData.length - 1];
@@ -140,9 +184,10 @@ function renderVotersList() {
     }
 
     listEl.innerHTML = votesData.map(v => `
-        <span class="bg-[#15092b] border border-purple-500/20 text-purple-200 text-[10px] font-medium px-2 py-1 rounded-none">
-            👤 ${v.voterName || 'Аноним'}
-        </span>
+        <button onclick="inspectVote('${v.id}')" class="bg-[#15092b] hover:bg-purple-900/50 border border-purple-500/20 text-purple-200 text-[10px] font-medium px-2.5 py-1 rounded-none flex items-center gap-1.5 transition">
+            <span>👤 ${v.voterName || 'Аноним'}</span>
+            ${v.isNational ? `<span class="text-[9px] bg-purple-800 text-yellow-300 px-1 font-bold">${v.representative}</span>` : ''}
+        </button>
     `).join('');
 }
 
