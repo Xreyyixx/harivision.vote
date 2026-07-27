@@ -1,11 +1,10 @@
 import { db, VOTING_POINTS, DEFAULT_PARTICIPANTS } from './config.js';
 import { doc, onSnapshot, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// Global State
-let systemState = { status: 'closed', endsAt: null };
-let currentSubPage = 'home'; // 'home' | 'recap' | 'voting'
+let systemState = { status: 'closed', endsAt: null, sessionId: null };
+let currentSubPage = 'home';
 let userVotes = {}; 
-let hasSubmittedVote = localStorage.getItem('harivision_voted') === 'true';
+let userName = ''; 
 let timerInterval = null;
 
 // Ambient Canvas Animation
@@ -56,14 +55,22 @@ animateBg();
 // Firestore Realtime Listener
 onSnapshot(doc(db, "system", "voting_state"), (docSnap) => {
     if (docSnap.exists()) {
-        systemState = docSnap.data();
+        const newData = docSnap.data();
+        
+        // Если началась НОВАЯ сессия голосования, сбрасываем локальную блокировку пользователя
+        const savedSession = localStorage.getItem('harivision_voted_session');
+        if (newData.sessionId && savedSession !== newData.sessionId) {
+            localStorage.removeItem('harivision_voted_session');
+            userVotes = {};
+        }
+
+        systemState = newData;
     } else {
-        systemState = { status: 'closed', endsAt: null };
+        systemState = { status: 'closed', endsAt: null, sessionId: null };
     }
     render();
 });
 
-// Timer formatting
 function formatTimer() {
     if (!systemState.endsAt) return "";
     const now = Date.now();
@@ -82,7 +89,7 @@ function startTimerLoop() {
     }, 1000);
 }
 
-// Global exposure for event handlers
+// Global Event Handlers
 window.assignScore = function(points, participantId) {
     for (const p in userVotes) {
         if (userVotes[p] === participantId) delete userVotes[p];
@@ -92,26 +99,42 @@ window.assignScore = function(points, participantId) {
     render();
 };
 
+window.updateUserName = function(val) {
+    userName = val;
+};
+
 window.navigateTo = function(subPage) {
     currentSubPage = subPage;
     render();
 };
 
 window.submitVote = async function() {
-    if (Object.keys(userVotes).length < VOTING_POINTS.length) {
-        alert("Please assign all points before submitting.");
+    const inputName = document.getElementById('voter-name-input');
+    const nameValue = inputName ? inputName.value.trim() : userName.trim();
+
+    if (!nameValue) {
+        alert("Пожалуйста, введите ваше имя перед отправкой голоса.");
         return;
     }
+
+    if (Object.keys(userVotes).length < VOTING_POINTS.length) {
+        alert("Пожалуйста, распределите все баллы перед отправкой.");
+        return;
+    }
+
     try {
         await addDoc(collection(db, "votes"), {
+            voterName: nameValue,
             allocations: userVotes,
+            sessionId: systemState.sessionId, // Привязка голоса к текущей сессии
             timestamp: serverTimestamp()
         });
-        hasSubmittedVote = true;
-        localStorage.setItem('harivision_voted', 'true');
+        
+        // Запоминаем, что пользователь проголосовал В ЭТОЙ конкретной сессии
+        localStorage.setItem('harivision_voted_session', systemState.sessionId);
         render();
     } catch (e) {
-        alert("Error submitting vote: " + e.message);
+        alert("Ошибка при отправке голоса: " + e.message);
     }
 };
 
@@ -126,13 +149,13 @@ function getHeartSVG() {
     `;
 }
 
-// UI State Controller
 function render() {
     const card = document.getElementById('app-card');
     const isExpired = systemState.endsAt && (systemState.endsAt.toMillis() <= Date.now());
+    const hasVotedInCurrentSession = localStorage.getItem('harivision_voted_session') === systemState.sessionId && systemState.sessionId;
 
-    // STATE 3: User Already Voted
-    if (hasSubmittedVote) {
+    // ЭКРАН 3: Участник уже проголосовал в ТЕКУЩЕЙ сессии
+    if (hasVotedInCurrentSession) {
         card.innerHTML = `
             <div class="flex flex-col items-center text-center my-auto py-10 page-fade">
                 <div class="w-20 h-20 bg-purple-900/40 border border-purple-500/40 flex items-center justify-center mb-6 text-yellow-400 shadow-[0_0_30px_rgba(168,85,247,0.2)]">
@@ -143,14 +166,12 @@ function render() {
                 <div class="border-t border-purple-500/10 pt-6 w-full max-w-sm">
                     <p class="text-xs text-slate-400 font-medium tracking-wide">Enjoy the rest of HariVision Performance Contest.</p>
                 </div>
-                <!-- Reserved Container for Personal Thank-You Video Stream -->
-                <div id="personalized-video-container" class="mt-6 hidden"></div>
             </div>
         `;
         return;
     }
 
-    // STATE 1: Voting Not Started or STATE 4: Closed
+    // ЭКРАН 1 и 4: Голосование не начато или завершено
     if (systemState.status === 'closed' || (systemState.status === 'open' && isExpired)) {
         if (systemState.status === 'open' && isExpired) {
             card.innerHTML = `
@@ -172,7 +193,7 @@ function render() {
         return;
     }
 
-    // STATE 2: Voting Open
+    // ЭКРАН 2: Голосование открыто
     startTimerLoop();
 
     if (currentSubPage === 'home') {
@@ -218,7 +239,14 @@ function render() {
                         <button onclick="navigateTo('recap')" class="text-[10px] font-bold uppercase tracking-widest text-purple-400 hover:text-white transition">↺ Recap</button>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 gap-3 max-h-[360px] overflow-y-auto pr-1">
+
+                <!-- Поле ввода имени участника -->
+                <div class="bg-[#140b29] border border-purple-500/20 p-4">
+                    <label class="block text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-2">Your Name / Имя Голосующего</label>
+                    <input type="text" id="voter-name-input" value="${userName}" oninput="updateUserName(this.value)" placeholder="Enter your full name..." class="w-full bg-[#090414] border border-purple-500/20 px-4 py-2.5 text-xs text-white focus:outline-none focus:border-purple-400" />
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 max-h-[300px] overflow-y-auto pr-1">
                     ${VOTING_POINTS.map(pts => {
                         const currentAssignedId = userVotes[pts] || '';
                         return `
@@ -238,7 +266,7 @@ function render() {
                         `;
                     }).join('')}
                 </div>
-                <div class="pt-4 border-t border-purple-500/10">
+                <div class="pt-2 border-t border-purple-500/10">
                     <button onclick="submitVote()" class="w-full bg-purple-700 hover:bg-purple-600 text-white font-extrabold text-xs uppercase tracking-widest py-4 rounded-none transition shadow-lg">Submit Vote</button>
                 </div>
             </div>
