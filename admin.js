@@ -1,10 +1,12 @@
-import { auth, db, VOTING_POINTS, DEFAULT_PARTICIPANTS } from './config.js';
+import { auth, db, DEFAULT_PARTICIPANTS } from './config.js';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { doc, setDoc, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { doc, setDoc, onSnapshot, collection, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 let votesData = [];
+let currentSessionId = null;
 let revealMode = false;
 let previousVoteCount = 0;
+let votesUnsubscribe = null;
 
 // Auth Listeners
 onAuthStateChanged(auth, (user) => {
@@ -18,7 +20,6 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// Login Execution
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = e.target.email.value;
@@ -35,12 +36,15 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
 document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
 
-// Global Actions Exposure
+// Запуск НОВОЙ сессии с уникальным ID
 window.openVoting = async function(minutes) {
+    const newSessionId = 'session_' + Date.now();
     const endsAt = minutes > 0 ? new Date(Date.now() + minutes * 60000) : null;
+    
     await setDoc(doc(db, "system", "voting_state"), {
         status: 'open',
         endsAt: endsAt,
+        sessionId: newSessionId,
         openedAt: new Date()
     });
 };
@@ -48,7 +52,8 @@ window.openVoting = async function(minutes) {
 window.closeVoting = async function() {
     await setDoc(doc(db, "system", "voting_state"), {
         status: 'closed',
-        endsAt: null
+        endsAt: null,
+        sessionId: currentSessionId
     });
 };
 
@@ -57,22 +62,27 @@ window.revealResults = function() {
     renderMatrix();
 };
 
-function showNotification() {
+function showNotification(voterName) {
     const container = document.getElementById('toast-container');
     container.innerHTML = `
-        <div class="bg-green-500/20 border border-green-500/40 text-green-300 font-bold text-xs uppercase tracking-wider px-4 py-2 flex items-center gap-2 animate-bounce">
-            ✓ New vote received
+        <div class="bg-green-500/20 border border-green-500/40 text-green-300 font-bold text-xs uppercase tracking-wider px-3 py-1.5 flex items-center gap-2 animate-bounce">
+            ✓ New vote from: ${voterName || 'Anonymous'}
         </div>
     `;
     setTimeout(() => { container.innerHTML = ''; }, 3500);
 }
 
-// Dashboard Synchronization
 function initDashboardListeners() {
-    // 1. Voting State Listener
     onSnapshot(doc(db, "system", "voting_state"), (docSnap) => {
         const data = docSnap.exists() ? docSnap.data() : { status: 'closed' };
         const isLive = data.status === 'open' && (!data.endsAt || data.endsAt.toMillis() > Date.now());
+
+        // При смене сессии переподписываемся на слушатель голосов
+        if (data.sessionId && data.sessionId !== currentSessionId) {
+            currentSessionId = data.sessionId;
+            revealMode = false;
+            subscribeToSessionVotes(currentSessionId);
+        }
 
         const ind = document.getElementById('live-indicator');
         if (isLive) {
@@ -97,23 +107,45 @@ function initDashboardListeners() {
             timerEl.innerText = isLive ? "Voting ends in: Unlimited" : "Voting ends in: --:--";
         }
     });
+}
 
-    // 2. Real-time Votes Listener
-    const q = query(collection(db, "votes"), orderBy("timestamp", "desc"));
-    onSnapshot(q, (snapshot) => {
+// Слушатель голосов ИСКЛЮЧИТЕЛЬНО текущей сессии
+function subscribeToSessionVotes(sessionId) {
+    if (votesUnsubscribe) votesUnsubscribe();
+
+    const q = query(collection(db, "votes"), where("sessionId", "==", sessionId));
+    
+    votesUnsubscribe = onSnapshot(q, (snapshot) => {
         votesData = snapshot.docs.map(doc => doc.data());
         
         if (votesData.length > previousVoteCount && previousVoteCount !== 0) {
-            showNotification();
+            const latestVote = votesData[votesData.length - 1];
+            showNotification(latestVote?.voterName);
         }
         previousVoteCount = votesData.length;
 
         document.getElementById('vote-count').innerText = `${votesData.length}`;
+        renderVotersList();
         renderMatrix();
     });
 }
 
-// Matrix Calculation
+function renderVotersList() {
+    const listEl = document.getElementById('voters-list');
+    if (!listEl) return;
+    
+    if (votesData.length === 0) {
+        listEl.innerHTML = `<span class="text-[10px] text-slate-500 italic">No votes yet</span>`;
+        return;
+    }
+
+    listEl.innerHTML = votesData.map(v => `
+        <span class="bg-[#15092b] border border-purple-500/20 text-purple-200 text-[10px] font-medium px-2 py-1 rounded-none">
+            👤 ${v.voterName || 'Anonymous'}
+        </span>
+    `).join('');
+}
+
 function renderMatrix() {
     const tbody = document.getElementById('matrix-body');
     tbody.innerHTML = '';
