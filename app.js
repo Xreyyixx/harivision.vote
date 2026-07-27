@@ -3,10 +3,10 @@ import { doc, onSnapshot, collection, addDoc, serverTimestamp } from "https://ww
 
 // Правила ограничений для стран
 const COUNTRY_RESTRICTIONS = {
-    "Родион": { blockedIds: ['p4', 'p7'], points: [12, 10, 8, 7, 6, 5] },
-    "Орнелла": { blockedIds: ['p1', 'p6'], points: [12, 10, 8, 7, 6, 5] },
-    "Виктория": { blockedIds: ['p3', 'p8'], points: [12, 10, 8, 7, 6, 5] },
-    "Анна": { blockedIds: ['p2', 'p5'], points: [12, 10, 8, 7, 6, 5] }
+    "RODION": { blockedIds: ['p4', 'p7'], points: [12, 10, 8, 7, 6, 5] },
+    "ORNELLA": { blockedIds: ['p1', 'p6'], points: [12, 10, 8, 7, 6, 5] },
+    "VICTORIA": { blockedIds: ['p3', 'p8'], points: [12, 10, 8, 7, 6, 5] },
+    "ANNA": { blockedIds: ['p2', 'p5'], points: [12, 10, 8, 7, 6, 5] }
 };
 
 let isNational = false;
