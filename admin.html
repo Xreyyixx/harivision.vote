@@ -12,7 +12,7 @@
         ::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.2); }
     </style>
 </head>
-<body class="p-6 md:p-12 min-h-screen select-none">
+<body class="p-6 md:p-12 min-h-screen select-none relative">
     <!-- Форма Авторизации -->
     <div id="auth-panel" class="max-w-md mx-auto my-20 bg-[#0e071c] border border-purple-500/20 p-8 shadow-2xl">
         <h1 class="text-xl font-bold uppercase tracking-widest text-white mb-6 text-center">HariVision Admin</h1>
@@ -71,16 +71,16 @@
                 </div>
             </div>
 
-            <!-- Статистика и участники -->
+            <!-- Статистика и проголосовавшие -->
             <div class="bg-[#0e071c] border border-purple-500/20 p-6 flex flex-col justify-between">
                 <div>
                     <h2 class="text-base font-bold text-white uppercase tracking-wider mb-2">Живая статистика</h2>
                     <div class="text-4xl font-black text-yellow-400 font-mono mb-2" id="vote-count">0</div>
                     
                     <div class="mt-4 border-t border-purple-500/10 pt-3">
-                        <div class="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-2">Проголосовавшие зрители (Текущая сессия)</div>
+                        <div class="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-2">Проголосовавшие зрители (Нажмите для просмотра)</div>
                         <div id="voters-list" class="max-h-28 overflow-y-auto flex flex-wrap gap-1.5 pr-1">
-                            <!-- Список динамически пополняется -->
+                            <!-- Элементы создаются динамически -->
                         </div>
                     </div>
 
@@ -90,7 +90,7 @@
             </div>
         </div>
 
-        <!-- Таблица подсчета результатов -->
+        <!-- Матрица баллов -->
         <div class="bg-[#0e071c] border border-purple-500/20 p-6 overflow-x-auto">
             <h2 class="text-base font-bold text-white uppercase tracking-wider mb-4">Матрица баллов в реальном времени</h2>
             <table class="w-full text-left text-xs font-mono">
@@ -112,6 +112,28 @@
                     <!-- Динамические строки -->
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Модальное окно просмотра деталей голоса -->
+    <div id="vote-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-[#0e071c] border border-purple-500/30 w-full max-w-lg p-6 flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b border-purple-500/20 pb-3">
+                <h3 id="modal-voter-name" class="text-base font-bold text-white uppercase">Детали голоса</h3>
+                <button onclick="closeVoteModal()" class="text-slate-400 hover:text-white font-bold">✕</button>
+            </div>
+            
+            <div id="modal-voter-details" class="text-xs text-purple-300 space-y-1"></div>
+
+            <div class="border-t border-purple-500/10 pt-3">
+                <div class="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-2">Выставленные баллы:</div>
+                <div id="modal-allocations" class="space-y-1.5 max-h-48 overflow-y-auto pr-1"></div>
+            </div>
+
+            <div class="flex gap-3 pt-4 border-t border-purple-500/20">
+                <button id="reset-vote-btn" class="flex-1 bg-red-700 hover:bg-red-600 text-white font-bold text-xs uppercase py-3 transition">Обнулить этот голос</button>
+                <button onclick="closeVoteModal()" class="bg-[#15092b] text-slate-300 font-bold text-xs uppercase py-3 px-6 transition">Закрыть</button>
+            </div>
         </div>
     </div>
 
