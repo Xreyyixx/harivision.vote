@@ -20,12 +20,12 @@ export const auth = getAuth(app);
 // Application Constants
 export const VOTING_POINTS = [12, 10, 8, 7, 6, 5, 4, 3];
 export const DEFAULT_PARTICIPANTS = [
-    { id: 'p1', name: 'Number 1' },
-    { id: 'p2', name: 'Number 2' },
-    { id: 'p3', name: 'Number 3' },
-    { id: 'p4', name: 'Number 4' },
-    { id: 'p5', name: 'Number 5' },
-    { id: 'p6', name: 'Number 6' },
-    { id: 'p7', name: 'Number 7' },
-    { id: 'p8', name: 'Number 8' }
+    { id: 'p1', name: '01 Монополия' },
+    { id: 'p2', name: '02 Ride' },
+    { id: 'p3', name: '03 Never Let You Go' },
+    { id: 'p4', name: '04 Bangaranga' },
+    { id: 'p5', name: '05 Вера' },
+    { id: 'p6', name: '06 Welcome To The Black Parade' },
+    { id: 'p7', name: '07 Euphoria' },
+    { id: 'p8', name: '08 You Are The Only One' }
 ];
