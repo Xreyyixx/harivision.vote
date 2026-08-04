@@ -373,7 +373,6 @@ function render() {
     }
 }
 
-// Запуск приложения по умолчанию для index.html
-if (window.location.pathname.endsWith('index.html') || window.location.pathname.endsWith('/')) {
-    initApp({ isNationalMode: false });
-}
+// Автоматическое определение режима при загрузке любой страницы
+const isNationalPage = window.location.pathname.includes('national.html');
+initApp({ isNationalMode: isNationalPage });
